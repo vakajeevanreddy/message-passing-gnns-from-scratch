@@ -140,8 +140,15 @@ def scatter_mean_to_nodes(edge_features, dst, num_nodes):
     node_mean[nonzero_mask] = node_sum[nonzero_mask]/counts[nonzero_mask].unsqueeze(-1)
     return node_mean
 
-# Step 8 - scatter_max_to_nodes (not yet solved)
-# TODO: implement
+# Step 8 - scatter_max_to_nodes
+def scatter_max_to_nodes(edge_features, dst, num_nodes):
+    # TODO: Scatter-max edge features onto destination nodes (elementwise max).
+    N,F = num_nodes,edge_features.size(1)
+    node_features = torch.full((N,F), float('-inf'),dtype = edge_features.dtype , device = edge_features.device)
+    for i in range(edge_features.size(0)):
+        nodes = dst[i]
+        node_features[nodes] = torch.maximum(node_features[nodes], edge_features[i])
+    return node_features
 
 # Step 9 - compute_messages (not yet solved)
 # TODO: implement
