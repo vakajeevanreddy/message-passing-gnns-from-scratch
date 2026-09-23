@@ -124,8 +124,21 @@ def scatter_sum_to_nodes(edge_features, dst, num_nodes):
     node_features.index_add_(0,dst,edge_features)
     return node_features
 
-# Step 7 - scatter_mean_to_nodes (not yet solved)
-# TODO: implement
+# Step 7 - scatter_mean_to_nodes
+def scatter_mean_to_nodes(edge_features, dst, num_nodes):
+    # TODO: Scatter-mean edge features onto destination nodes (sum then divide by in-degree).
+    N,F = num_nodes,edge_features.size(1)
+    node_sum = torch.zeros((N,F),dtype = edge_features.dtype , device = edge_features.device)
+    node_sum.index_add_(0,dst,edge_features)
+
+    counts = torch.zeros(N,dtype = edge_features.dtype, device = edge_features.device)
+    ones = torch.ones(dst.size(0), dtype = edge_features.dtype, device = edge_features.device)
+    counts.index_add_(0,dst,ones)
+
+    node_mean = torch.zeros_like(node_sum)
+    nonzero_mask = counts > 0
+    node_mean[nonzero_mask] = node_sum[nonzero_mask]/counts[nonzero_mask].unsqueeze(-1)
+    return node_mean
 
 # Step 8 - scatter_max_to_nodes (not yet solved)
 # TODO: implement
