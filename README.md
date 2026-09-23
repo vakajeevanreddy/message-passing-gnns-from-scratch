@@ -11,7 +11,7 @@ python scaffold.py
 ## Steps
 
 - [x] **1.** edges_to_coo
-- [ ] **2.** add_self_loops
+- [x] **2.** add_self_loops
 - [ ] **3.** compute_node_degrees
 - [ ] **4.** symmetric_normalize_edge_weights
 - [ ] **5.** gather_source_node_features
