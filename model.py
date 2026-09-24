@@ -174,8 +174,39 @@ def compute_messages(node_features, src, dst, message_fn, edge_attr=None):
         messages = message_fn(src_features,Dst_features)
     return messages
 
-# Step 10 - aggregate_messages (not yet solved)
-# TODO: implement
+# Step 10 - aggregate_messages
+def aggregate_messages(messages, dst, num_nodes, aggr='sum'):
+    """Aggregate edge messages onto destination nodes using sum, mean, or max.
+
+    Args:
+        messages: FloatTensor of shape (E, M) with one message vector per edge.
+        dst: LongTensor of shape (E,) with destination node index for each edge.
+        num_nodes: int, number of nodes N in the graph.
+        aggr: str in {'sum', 'mean', 'max'} selecting the reduction.
+
+    Returns:
+        FloatTensor of shape (N, M); row j is the aggregated message for node j.
+    """
+    # TODO: Aggregate edge messages onto destination nodes via sum/mean/max...
+    E,M = messages.shape
+    out = torch.zeros(num_nodes,M,device = messages.device)
+
+    if aggr == 'sum':
+        out.index_add_(0,dst,messages)
+    elif aggr == 'mean':
+        out.index_add_(0,dst,messages)
+        counts = torch.bincount(dst,minlength = num_nodes).clamp(min=1).unsqueeze(-1)
+        out = out/counts
+    elif aggr == 'max':
+        out.fill_(float('-inf'))
+        if hasattr(torch.Tensor, "scatter_reduce_"):
+            out.scatter_reduce_(0,dst.unsqueeze(-1).expand(-1,M),messages,reduce = "amax", include_self = True)
+        else:
+            out.index_put_((dst,), messages, accumulate = True)
+        out[out == float('-inf')] = 0.0
+    else:
+        raise ValueError(f"Unsupported aggregation mode: {aggr}")
+    return out
 
 # Step 11 - update_node_features (not yet solved)
 # TODO: implement
