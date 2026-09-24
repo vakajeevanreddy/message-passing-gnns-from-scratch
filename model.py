@@ -246,20 +246,14 @@ def message_passing_layer(node_features, src, dst,
     elif aggr == 'max':
         aggregated.fill_(float('-inf'))
         if hasattr(torch.Tensor, "scatter_reduce_"):
-            aggregated.scatter_reduce_(0,
-                dst.unsqueeze(-1).expand(-1, M),
-                messages,
-                reduce="amax",
-                include_self=True
-            )
+            aggregated.scatter_reduce_(0,dst.unsqueeze(-1).expand(-1, M),
+                messages,reduce="amax",include_self=True)
         else:
             aggregated.index_put_((dst,), messages, accumulate=True)
         # Replace -inf with 0 for nodes with no incoming messages
         #aggregated[aggregated == float('-inf')] = 0.0
-
     else:
         raise ValueError(f"Unsupported aggregation mode: {aggr}")
-
     # Step 3: update node features
     updated = update_fn(node_features, aggregated)
     return updated
