@@ -215,8 +215,54 @@ def update_node_features(node_features, aggregated, update_fn):
         raise ValueError("update_fn must be a callable function")
     return update_fn(node_features,aggregated)
 
-# Step 12 - message_passing_layer (not yet solved)
-# TODO: implement
+# Step 12 - message_passing_layer
+import torch
+
+def message_passing_layer(node_features, src, dst,
+                          message_fn, update_fn,
+                          aggr='sum', edge_attr=None):
+    """Run one full Gilmer MPNN step: message, aggregate, and update."""
+    # Step 1: compute messages
+    src_feats = node_features[src]
+    dst_feats = node_features[dst]
+    if edge_attr is not None:
+        messages = message_fn(src_feats, dst_feats, edge_attr)
+    else:
+        messages = message_fn(src_feats, dst_feats)
+
+    # Step 2: aggregate messages
+    N = node_features.size(0)
+    M = messages.size(1)
+    aggregated = torch.zeros(N, M, device=node_features.device)
+
+    if aggr == 'sum':
+        aggregated.index_add_(0, dst, messages)
+
+    elif aggr == 'mean':
+        aggregated.index_add_(0, dst, messages)
+        counts = torch.bincount(dst, minlength=N).clamp(min=1).unsqueeze(-1)
+        aggregated = aggregated / counts
+
+    elif aggr == 'max':
+        aggregated.fill_(float('-inf'))
+        if hasattr(torch.Tensor, "scatter_reduce_"):
+            aggregated.scatter_reduce_(0,
+                dst.unsqueeze(-1).expand(-1, M),
+                messages,
+                reduce="amax",
+                include_self=True
+            )
+        else:
+            aggregated.index_put_((dst,), messages, accumulate=True)
+        # Replace -inf with 0 for nodes with no incoming messages
+        #aggregated[aggregated == float('-inf')] = 0.0
+
+    else:
+        raise ValueError(f"Unsupported aggregation mode: {aggr}")
+
+    # Step 3: update node features
+    updated = update_fn(node_features, aggregated)
+    return updated
 
 # Step 13 - stack_message_passing_layers (not yet solved)
 # TODO: implement
