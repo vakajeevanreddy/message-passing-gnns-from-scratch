@@ -28,7 +28,7 @@ python scaffold.py
 - [ ] **16.** gcn_layer_forward
 - [ ] **17.** init_gcn_parameters
 - [ ] **18.** gcn_stack_forward
-- [ ] **19.** gat_attention_logits
+- [x] **19.** gat_attention_logits
 - [ ] **20.** gat_masked_neighbor_softmax
 - [ ] **21.** gat_head_forward
 - [ ] **22.** merge_gat_heads

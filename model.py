@@ -300,8 +300,32 @@ def stack_message_passing_layers(node_features, src, dst, layers, edge_attr=None
 # Step 18 - gcn_stack_forward (not yet solved)
 # TODO: implement
 
-# Step 19 - gat_attention_logits (not yet solved)
-# TODO: implement
+# Step 19 - gat_attention_logits
+import torch.nn.functional as F
+
+def gat_attention_logits(node_features, src, dst, attn_src, attn_dst, weight):
+    """Compute unnormalized GAT attention logits and transformed features.
+
+    Args:
+        node_features: FloatTensor of shape (N, Fin).
+        src: LongTensor of shape (E,) source indices.
+        dst: LongTensor of shape (E,) destination indices.
+        attn_src: FloatTensor of shape (Fout,) source attention vector.
+        attn_dst: FloatTensor of shape (Fout,) destination attention vector.
+        weight: FloatTensor of shape (Fin, Fout) shared linear transform.
+
+    Returns:
+        logits: FloatTensor of shape (E,) unnormalized attention scores.
+        transformed: FloatTensor of shape (N, Fout) linearly transformed nodes.
+    """
+    # TODO: return per-edge LeakyReLU attention logits and transformed features
+    h_prime = node_features @ weight
+    h_src = h_prime[src]
+    h_dst = h_prime[dst]
+    alpha_src = (h_src * attn_src).sum(dim = -1)
+    alpha_dst = (h_dst * attn_dst).sum(dim = -1)
+    logits = F.leaky_relu(alpha_src + alpha_dst, negative_slope = 0.2)
+    return logits,h_prime
 
 # Step 20 - gat_masked_neighbor_softmax (not yet solved)
 # TODO: implement
