@@ -208,8 +208,12 @@ def aggregate_messages(messages, dst, num_nodes, aggr='sum'):
         raise ValueError(f"Unsupported aggregation mode: {aggr}")
     return out
 
-# Step 11 - update_node_features (not yet solved)
-# TODO: implement
+# Step 11 - update_node_features
+def update_node_features(node_features, aggregated, update_fn):
+    # TODO: Implement update_node_features to fuse each node's current state with its aggregated...
+    if not callable(update_fn):
+        raise ValueError("update_fn must be a callable function")
+    return update_fn(node_features,aggregated)
 
 # Step 12 - message_passing_layer (not yet solved)
 # TODO: implement
