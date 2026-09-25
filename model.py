@@ -350,8 +350,50 @@ def gat_masked_neighbor_softmax(logits, dst, num_nodes):
     attn_coeffs = exp_logits / sum_per_dst[dst]
     return attn_coeffs
 
-# Step 21 - gat_head_forward (not yet solved)
-# TODO: implement
+# Step 21 - gat_head_forward
+def gat_head_forward(node_features, src, dst, weight, attn_src, attn_dst, bias=None, num_nodes=None, activation=None):
+    """Forward pass of a single GAT attention head.
+
+    Args:
+        node_features: FloatTensor of shape (N, Fin).
+        src: LongTensor of shape (E,) source indices.
+        dst: LongTensor of shape (E,) destination indices.
+        weight: FloatTensor of shape (Fin, Fout) shared linear transform.
+        attn_src: FloatTensor of shape (Fout,) source attention vector.
+        attn_dst: FloatTensor of shape (Fout,) destination attention vector.
+        bias: optional FloatTensor of shape (Fout,).
+        num_nodes: optional int N; inferred from node_features if None.
+        activation: optional callable applied to the head output.
+
+    Returns:
+        head_out: FloatTensor of shape (N, Fout).
+        attn_coeffs: FloatTensor of shape (E,) attention coefficients.
+    """
+    # TODO: Forward pass of a single GAT attention head: transform, coeffs, aggregate...
+    if num_nodes is None:
+        num_nodes = node_features.size(0)
+    h = node_features @ weight
+    h_src = h[src]
+    h_dst = h[dst]
+    logits = (h_src * attn_src).sum(dim = -1) + (h_dst * attn_dst).sum(dim=-1)
+    logits = F.leaky_relu(logits, negative_slope=0.2)
+
+
+    max_per_dst = torch.full((num_nodes,),float('-inf'))
+    max_per_dst.scatter_reduce_(0,dst,logits,reduce = "amax",include_self = True)
+    stable_logits = logits - max_per_dst[dst]
+    exp_logits = stable_logits.exp()
+    sum_per_dst = torch.zeros(num_nodes,device = logits.device)
+    sum_per_dst.scatter_add_(0,dst,exp_logits)
+    alpha = exp_logits / sum_per_dst[dst]
+
+    out = torch.zeros((num_nodes,weight.size(1)),device = h.device)
+    out.scatter_add_(0,dst.unsqueeze(-1).expand(-1,h.size(1)),alpha.unsqueeze(-1)*h_src)
+    if bias is not None:
+        out = out + bias
+    if activation is not None:
+        out = activation(out)
+    return out,alpha
 
 # Step 22 - merge_gat_heads (not yet solved)
 # TODO: implement
