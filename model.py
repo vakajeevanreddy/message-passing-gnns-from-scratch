@@ -285,8 +285,28 @@ def stack_message_passing_layers(node_features, src, dst, layers, edge_attr=None
         intermidates.append(h)
     return h,intermidates
 
-# Step 14 - gcn_renormalize_adjacency (not yet solved)
-# TODO: implement
+# Step 14 - gcn_renormalize_adjacency
+import torch
+
+def gcn_renormalize_adjacency(src, dst, num_nodes):
+    device = src.device
+
+    # Step 1: add self-loops
+    self_loops = torch.arange(num_nodes, device=device)
+    src_hat = torch.cat([src, self_loops])
+    dst_hat = torch.cat([dst, self_loops])
+
+    # Step 2: compute degree (incoming edges + self-loops)
+    deg = torch.zeros(num_nodes, device=device)
+    deg.scatter_add_(0, dst_hat, torch.ones_like(dst_hat, dtype=deg.dtype))
+
+    # Step 3: symmetric normalization
+    deg_inv_sqrt = deg.pow(-0.5)
+    deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.0
+
+    norm_weight = deg_inv_sqrt[src_hat] * deg_inv_sqrt[dst_hat]
+
+    return src_hat, dst_hat, norm_weight
 
 # Step 15 - gcn_linear_transform (not yet solved)
 # TODO: implement
