@@ -514,7 +514,7 @@ def merge_gat_heads(head_outputs, mode='concat'):
     if mode == "mean":
         return head_outputs.mean(dim = 0)
     else:
-        raise ValueError(f"Unsupported mode '{mode}' ")
+        raise ValueError(f"Unsupported mode '{mode}' use 'concat' or 'mean' ")
 
 # Step 23 - gat_layer_forward (not yet solved)
 # TODO: implement
