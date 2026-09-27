@@ -500,8 +500,21 @@ def gat_head_forward(node_features, src, dst, weight, attn_src, attn_dst, bias=N
         out = activation(out)
     return out,alpha
 
-# Step 22 - merge_gat_heads (not yet solved)
-# TODO: implement
+# Step 22 - merge_gat_heads
+def merge_gat_heads(head_outputs, mode='concat'):
+    # TODO: Merge multi-head GAT outputs into one node-feature tensor.
+    if isinstance(head_outputs,(list,tuple)):
+        head_outputs = torch.stack(head_outputs)
+    if head_outputs.dim() != 3:
+        raise ValueError("Expected input of shape[H,N,F] or list [N,F] tensors")
+    H,N,F = head_outputs.shape
+    if mode == "concat":
+        return head_outputs.permute(1,0,2).reshape(N,H*F)
+
+    if mode == "mean":
+        return head_outputs.mean(dim = 0)
+    else:
+        raise ValueError(f"Unsupported mode '{mode}' ")
 
 # Step 23 - gat_layer_forward (not yet solved)
 # TODO: implement
