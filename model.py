@@ -551,8 +551,43 @@ def gat_layer_forward(node_features, src, dst, head_params, merge_mode='concat',
         out = activation(out)
     return out,all_attn
 
-# Step 24 - init_gat_parameters (not yet solved)
-# TODO: implement
+# Step 24 - init_gat_parameters
+import torch
+import math
+
+def init_gat_parameters(in_dim, out_dim, num_heads=1, with_bias=True, seed=None):
+    # Initialize multi-head GAT parameters with Glorot-style initialization.
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    params = []
+    a_w = math.sqrt(6.0 / (in_dim + out_dim))
+    a_attn = math.sqrt(6.0 / (out_dim + 1))
+
+    for _ in range(num_heads):
+        weight = torch.empty((in_dim, out_dim), dtype=torch.float32).uniform_(-a_w, a_w)
+        weight.requires_grad_(True)
+
+        attn_src = torch.empty((out_dim,), dtype=torch.float32).uniform_(-a_attn, a_attn)
+        attn_src.requires_grad_(True)
+
+        attn_dst = torch.empty((out_dim,), dtype=torch.float32).uniform_(-a_attn, a_attn)
+        attn_dst.requires_grad_(True)
+
+        head_dict = {
+            "weight": weight,
+            "attn_src": attn_src,
+            "attn_dst": attn_dst
+        }
+
+        if with_bias:
+            bias = torch.zeros((out_dim,), dtype=torch.float32)
+            bias.requires_grad_(True)
+            head_dict["bias"] = bias
+
+        params.append(head_dict)
+
+    return params
 
 # Step 25 - gat_stack_forward (not yet solved)
 # TODO: implement
