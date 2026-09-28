@@ -589,8 +589,44 @@ def init_gat_parameters(in_dim, out_dim, num_heads=1, with_bias=True, seed=None)
 
     return params
 
-# Step 25 - gat_stack_forward (not yet solved)
-# TODO: implement
+# Step 25 - gat_stack_forward
+def gat_stack_forward(node_features, src, dst, layer_param_list, merge_modes=None, activations=None, num_nodes=None):
+    """Run a stack of multi-head GAT layers.
+
+    Args:
+        node_features: FloatTensor (N, F0).
+        src: LongTensor (E,) source indices.
+        dst: LongTensor (E,) destination indices.
+        layer_param_list: list of length L; each entry is a head_params list
+            for gat_layer_forward.
+        merge_modes: optional list of L merge mode strings ('concat' or 'mean').
+            Defaults to 'concat' for every layer.
+        activations: optional list of L callables or None. Defaults to no
+            activation for every layer.
+        num_nodes: optional int N; inferred from node_features if None.
+
+    Returns:
+        embeddings: FloatTensor (N, FL) final layer output.
+        all_layer_outputs: list of L FloatTensors, the output after each layer.
+    """
+    # TODO: Run a stack of multi-head GAT layers for deep node embeddings.
+    num_layers = len(layer_param_list)
+
+    if merge_modes is None:
+        merge_modes = ["concat"]*num_layers
+    if activations is None:
+        activations = [None] * num_layers
+    if num_nodes is None:
+        num_nodes = node_features.shape[0]
+    all_layer_outputs = []
+    out = node_features
+    for i,head_params in enumerate(layer_param_list):
+        out,_ = gat_layer_forward(out,src,dst,head_params,
+                num_nodes = out.shape[0],
+                merge_mode = merge_modes[i],
+                activation = activations[i])
+        all_layer_outputs.append(out)
+    return out,all_layer_outputs
 
 # Step 26 - global_mean_pool (not yet solved)
 # TODO: implement
