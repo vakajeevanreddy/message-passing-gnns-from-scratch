@@ -628,8 +628,30 @@ def gat_stack_forward(node_features, src, dst, layer_param_list, merge_modes=Non
         all_layer_outputs.append(out)
     return out,all_layer_outputs
 
-# Step 26 - global_mean_pool (not yet solved)
-# TODO: implement
+# Step 26 - global_mean_pool
+def global_mean_pool(node_features, batch_index, num_graphs=None):
+    """Globally mean-pool node features into one graph-level vector per graph.
+
+    Args:
+        node_features: FloatTensor of shape (N, F) with one feature row per node.
+        batch_index: LongTensor of shape (N,) mapping each node to a graph id in
+            {0, ..., B-1}.
+        num_graphs: Optional int B. If None, inferred as batch_index.max() + 1.
+
+    Returns:
+        FloatTensor of shape (B, F); row b is the mean of node features with
+        batch_index == b.
+    """
+    # TODO: Mean-pool node features into one graph-level vector per graph...
+    if num_graphs is None:
+        num_graphs = int(batch_index.max().item()) + 1
+    summed = scatter_sum_to_nodes(node_features,batch_index,num_graphs)
+    ones = torch.ones(batch_index.size(0), 1 , device = node_features.device)
+    counts = scatter_sum_to_nodes(ones,batch_index,num_graphs)
+
+    counts = counts.clamp(min = 1)
+    mean_pooled = summed / counts
+    return mean_pooled
 
 # Step 27 - global_sum_pool (not yet solved)
 # TODO: implement
