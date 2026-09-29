@@ -715,8 +715,13 @@ def node_classification_head(node_embeddings, weight, bias=None):
         logits = logits + bias
     return logits
 
-# Step 31 - graph_regression_head (not yet solved)
-# TODO: implement
+# Step 31 - graph_regression_head
+def graph_regression_head(graph_embeddings, weight, bias=None):
+    # TODO: Map pooled graph embeddings to regression predictions via a linear head.
+    preds = graph_embeddings @ weight.T
+    if bias is not None:
+        preds = preds + bias
+    return preds
 
 # Step 32 - generate_sbm_graph (not yet solved)
 # TODO: implement
