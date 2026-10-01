@@ -755,8 +755,22 @@ def generate_sbm_graph(num_nodes, num_classes, p_in, p_out, feature_dim, seed=No
         "num_nodes": num_nodes
     }
 
-# Step 33 - build_node_classification_dataset (not yet solved)
-# TODO: implement
+# Step 33 - build_node_classification_dataset
+def build_node_classification_dataset(num_graphs, num_nodes, num_classes, p_in, p_out, feature_dim, seed=None):
+    # TODO: Build a list of SBM graphs with consistent schema for node classification.
+
+
+    graphs = []
+    for i in range(num_graphs):
+        graph_seed = seed + i if seed is not None else None
+        g = generate_sbm_graph(num_nodes = num_nodes,
+                            num_classes = num_classes,
+                            feature_dim = feature_dim,
+                            p_in =p_in,
+                            p_out=p_out,
+                            seed = graph_seed)
+        graphs.append(g)
+    return graphs
 
 # Step 34 - generate_molecule_like_graph (not yet solved)
 # TODO: implement
