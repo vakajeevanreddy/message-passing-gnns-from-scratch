@@ -772,8 +772,29 @@ def build_node_classification_dataset(num_graphs, num_nodes, num_classes, p_in, 
         graphs.append(g)
     return graphs
 
-# Step 34 - generate_molecule_like_graph (not yet solved)
-# TODO: implement
+# Step 34 - generate_molecule_like_graph
+def generate_molecule_like_graph(num_nodes, num_node_features, edge_prob=0.3, seed=0):
+    # TODO: Synthesize one molecule-like graph with features, edges, and target...
+    if seed is not None:
+        torch.manual_seed(seed)
+    x = torch.randn(num_nodes,num_node_features)
+    edges = []
+    for i in range(num_nodes):
+        for j in range(i+1,num_nodes):
+            if torch.rand(1).item() < edge_prob:
+                edges.append([i,j])
+                edges.append([j,i])
+    if edges:
+        edge_index = torch.tensor(edges,dtype = torch.long).t().contiguous()
+    else:
+        edge_index = torch.empty((2,0),dtype = torch.long)
+    deg = torch.zeros(num_nodes,dtype = torch.float)
+    for i,j in edges:
+        deg[i] += 1
+    mean_node = x.mean(dim=1)
+    y_val = (deg * mean_node).mean()
+    y = torch.tensor(y_val,dtype = torch.float)
+    return {"x" : x, "edge_index" : edge_index, "y":y}
 
 # Step 35 - build_graph_regression_dataset (not yet solved)
 # TODO: implement
