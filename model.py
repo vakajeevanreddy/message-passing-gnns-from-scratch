@@ -811,8 +811,37 @@ def build_graph_regression_dataset(num_graphs, num_nodes_range, num_node_feature
         graphs.append(g)
     return graphs
 
-# Step 36 - collate_graph_batch (not yet solved)
-# TODO: implement
+# Step 36 - collate_graph_batch
+def collate_graph_batch(graphs):
+    xs = []
+    edge_indexes = []
+    ys = []
+    batch = []
+    node_offset = 0
+    for gid, g in enumerate(graphs):
+        x = g["x"]
+        edge_index = g["edge_index"]
+        y = g["y"]
+        N_i = x.size(0)
+
+        xs.append(x)
+        edge_indexes.append(edge_index + node_offset)
+        batch.append(torch.full((N_i,), gid, dtype=torch.long))
+        ys.append(torch.as_tensor(y, dtype=torch.float).view(()))
+
+        node_offset += N_i
+
+    x_cat = torch.cat(xs, dim=0)
+    edge_index_cat = torch.cat(edge_indexes, dim=1)
+    batch_cat = torch.cat(batch, dim=0)
+    y_stack = torch.stack(ys, dim=0)
+
+    return {
+        "x": x_cat,
+        "edge_index": edge_index_cat, 
+        "batch": batch_cat,
+        "y": y_stack,
+    }
 
 # Step 37 - cross_entropy_loss (not yet solved)
 # TODO: implement
