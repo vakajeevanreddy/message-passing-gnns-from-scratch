@@ -858,8 +858,14 @@ def mse_loss(predictions, targets):
     squared_diff = (predictions - targets) ** 2
     return squared_diff.mean()
 
-# Step 39 - accuracy_metric (not yet solved)
-# TODO: implement
+# Step 39 - accuracy_metric
+import numpy as np
+def accuracy_metric(logits, targets):
+    # TODO: Return the fraction of argmax(logits) predictions matching targets.
+    predictions = np.argmax(logits,axis = 1 )
+    correct = (predictions == targets).sum()
+    accuracy = correct / len(targets)
+    return float(accuracy)
 
 # Step 40 - mae_metric (not yet solved)
 # TODO: implement
