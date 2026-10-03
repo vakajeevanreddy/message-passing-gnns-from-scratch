@@ -850,8 +850,13 @@ def cross_entropy_loss(logits, targets):
     loses = -log_probs[torch.arange(logits.size(0)),targets]
     return loses.mean()
 
-# Step 38 - mse_loss (not yet solved)
-# TODO: implement
+# Step 38 - mse_loss
+def mse_loss(predictions, targets):
+    # TODO: Compute mean squared error between predictions and targets
+    predictions = predictions.view(-1)
+    targets = targets.view(-1)
+    squared_diff = (predictions - targets) ** 2
+    return squared_diff.mean()
 
 # Step 39 - accuracy_metric (not yet solved)
 # TODO: implement
