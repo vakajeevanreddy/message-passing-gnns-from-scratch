@@ -891,45 +891,34 @@ def gnn_train_step(params, batch, forward_fn, loss_fn, lr):
     return {"loss" : loss.item(),"params":params}
 
 # Step 42 - train_node_classifier
-import torch
-import torch.nn.functional as F
-
-def train_node_classifier(params, dataset, forward_fn, num_epochs, lr, mask_key="train_mask"):
+def train_node_classifier(params, dataset, forward_fn, num_epochs, lr, mask_key='train_mask'):
+    # TODO: Train a functional node-classification GNN for several epochs on a masked graph
     history = []
     y_all = dataset["y"]
-    mask = dataset[mask_key].bool() 
-
+    mask = dataset[mask_key].bool()
     for epoch in range(num_epochs):
         x = dataset["x"]
         edge_index = dataset["edge_index"]
-
-        preds = forward_fn(params, x, edge_index)  # logits (N, C)
-
+        preds = forward_fn(params,x,edge_index)
         preds_masked = preds[mask]
         targets_masked = y_all[mask]
 
-        # Loss
-        loss = F.cross_entropy(preds_masked, targets_masked)
+        loss = F.cross_entropy(preds_masked,targets_masked)
         loss.backward()
 
-        # SGD update
         with torch.no_grad():
             for p in params.values():
-                if p.grad is not None:
+                if p.grad is not  None:
                     p -= lr * p.grad
                     p.grad.zero_()
-
-        # Evaluate accuracy under no_grad
         with torch.no_grad():
-            logits = forward_fn(params, x, edge_index)
+            logits = forward_fn(params,x,edge_index)
             logits_masked = logits[mask]
             labels_masked = y_all[mask]
-            correct = (logits_masked.argmax(dim=-1) == labels_masked).sum().item()
+            correct = (logits_masked.argmax(dim = - 1) == labels_masked).sum().item()
             acc = correct / mask.sum().item()
-
-        history.append({"loss": loss.item(), "accuracy": acc})
-
-    return {"history": history, "params": params}
+        history.append({"loss" : loss.item(),"accuracy" : acc})
+    return {"history" : history , "params" : params}
 
 # Step 43 - train_graph_regressor (not yet solved)
 # TODO: implement
