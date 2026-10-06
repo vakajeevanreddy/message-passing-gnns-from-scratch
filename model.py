@@ -920,8 +920,99 @@ def train_node_classifier(params, dataset, forward_fn, num_epochs, lr, mask_key=
         history.append({"loss" : loss.item(),"accuracy" : acc})
     return {"history" : history , "params" : params}
 
-# Step 43 - train_graph_regressor (not yet solved)
-# TODO: implement
+# Step 43 - train_graph_regressor
+import torch
+import torch.nn.functional as F
+
+def train_graph_regressor(params, graphs, forward_fn, collate_fn=None, num_epochs=20, lr=0.01, batch_size=8):
+    """Train a graph regressor over multiple epochs of mini-batches.
+
+    Args:
+        params: dict of trainable torch tensors.
+        graphs: list of graph dicts with keys x, edge_index, y.
+        forward_fn: callable(params, batch) -> predictions.
+        collate_fn: callable(list_of_graphs) -> batched graph dict (optional).
+        num_epochs: number of training epochs (default 20).
+        lr: learning rate for SGD updates (default 0.01).
+        batch_size: graphs per mini-batch (default 8).
+
+    Returns:
+        history: dict with 'loss' and 'mae' lists of per-epoch floats.
+        params: updated parameter dict.
+    """
+    if collate_fn is None:
+        def collate_fn(batch_graphs):
+            xs = [torch.as_tensor(g["x"], dtype=torch.float) for g in batch_graphs]
+            processed_xs = []
+            for x in xs:
+                if x.ndim == 1:
+                    x = x.unsqueeze(1)
+                elif x.ndim > 2:
+                    x = x.reshape(x.shape[0], -1)
+                processed_xs.append(x)
+            
+            # Align feature dimensions across graphs in the batch to prevent shape mismatches
+            max_feat = max(x.shape[1] for x in processed_xs)
+            aligned_xs = []
+            for x in processed_xs:
+                if x.shape[1] < max_feat:
+                    x = F.pad(x, (0, max_feat - x.shape[1]))
+                elif x.shape[1] > max_feat:
+                    x = x[:, :max_feat]
+                aligned_xs.append(x)
+            
+            x_tensor = torch.cat(aligned_xs, dim=0)
+
+            return {
+                "x": x_tensor,
+                "edge_index": [g["edge_index"] for g in batch_graphs],
+                "y": torch.stack([torch.as_tensor(g["y"], dtype=torch.float) for g in batch_graphs]),
+                "batch": torch.cat([torch.full((x.shape[0],), i, dtype=torch.long) for i, x in enumerate(aligned_xs)])
+            }
+
+    history = {"loss": [], "mae": []}
+    n = len(graphs)
+    y_all = torch.stack([torch.as_tensor(g["y"], dtype=torch.float).view(()) for g in graphs])
+
+    for epoch in range(num_epochs):
+        total_loss = 0.0
+        n_batches = 0
+        perm = torch.randperm(n)
+
+        for start in range(0, n, batch_size):
+            batch_indices = perm[start:start + batch_size]
+            batch_graphs = [graphs[j.item()] for j in batch_indices]
+            batch = collate_fn(batch_graphs)
+            preds = forward_fn(params, batch).view(-1)
+            targets = batch["y"].view(-1)
+
+            loss = F.mse_loss(preds, targets)
+            loss.backward()
+
+            with torch.no_grad():
+                for p in params.values():
+                    if p.grad is not None:
+                        p -= lr * p.grad
+                        p.grad.zero_()
+            total_loss += loss.item()
+            n_batches += 1
+
+        mean_loss = total_loss / max(n_batches, 1)
+        history["loss"].append(mean_loss)
+
+        with torch.no_grad():
+            preds_all = []
+            for start in range(0, n, batch_size):
+                batch_graphs = graphs[start:start + batch_size]
+                batch = collate_fn(batch_graphs)
+                preds = forward_fn(params, batch).view(-1)
+                preds_all.append(preds)
+            preds_all = torch.cat(preds_all)
+            mae = (preds_all - y_all).abs().mean().item()
+
+        history["mae"].append(mae)
+
+    return history, params
 
 # Step 44 - representation_similarity (not yet solved)
 # TODO: implement
