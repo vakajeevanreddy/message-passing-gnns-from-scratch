@@ -1022,8 +1022,18 @@ def representation_similarity(features_a, features_b):
     cos_sim = (norm_a * norm_b).sum(dim = 1)
     return cos_sim.mean().item()
 
-# Step 45 - oversmoothing_diagnostic (not yet solved)
-# TODO: implement
+# Step 45 - oversmoothing_diagnostic
+def oversmoothing_diagnostic(layer_features):
+    # TODO: Diagnose oversmoothing via consecutive-layer representation similarities.
+    L = len(layer_features)
+    if  L < 2 :
+        return {"pairwise_similarities" : [], "mean_similarity" : 0.0}
+    pairwise = []
+    for i in range(L - 1):
+        sim = representation_similarity(layer_features[i], layer_features[i+1])
+        pairwise.append(sim)
+    mean_sim = sum(pairwise)/len(pairwise)
+    return {"pairwise_similarities": pairwise, "mean_similarity": mean_sim}
 
 # Step 46 - mpnn_gnn_experiment (not yet solved)
 # TODO: implement
