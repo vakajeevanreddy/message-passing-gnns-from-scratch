@@ -1026,12 +1026,11 @@ def mpnn_gnn_experiment(num_nodes=40,num_features=8,num_classes=2,num_layers=3,h
     x=graph["node_features"].float()
     edge_index=graph["edge_index"].long()
     y=graph["node_labels"].long()
+    src,dst=edge_index[0],edge_index[1]
     n=x.shape[0]
 
-    if n!=num_nodes or y.numel()!=n:
-        raise ValueError("Graph features and labels have inconsistent dimensions.")
-    if edge_index.ndim!=2 or edge_index.shape[0]!=2:
-        raise ValueError("edge_index must have shape (2,E).")
+    if y.numel()!=n:
+        raise ValueError("Node features and labels do not match.")
 
     train_mask=torch.zeros(n,dtype=torch.bool)
     train_mask[torch.randperm(n)[:max(1,n//2)]]=True
@@ -1045,7 +1044,6 @@ def mpnn_gnn_experiment(num_nodes=40,num_features=8,num_classes=2,num_layers=3,h
         d=init_gcn_parameters(num_features if i==0 else hidden_dim,hidden_dim,seed=seed+10+i)
         gcn_params[f"l{i}_weight"]=leaf(d["weight"])
         gcn_params[f"l{i}_bias"]=leaf(d["bias"])
-
     d=init_gcn_parameters(hidden_dim,num_classes,seed=seed+50)
     gcn_params["head_weight"]=leaf(d["weight"])
     gcn_params["head_bias"]=leaf(d["bias"])
@@ -1061,27 +1059,23 @@ def mpnn_gnn_experiment(num_nodes=40,num_features=8,num_classes=2,num_layers=3,h
         gat_params[f"l{i}_h0_attn_src"]=leaf(d["attn_src"])
         gat_params[f"l{i}_h0_attn_dst"]=leaf(d["attn_dst"])
         gat_params[f"l{i}_h0_bias"]=leaf(d["bias"])
-
     d=init_gcn_parameters(hidden_dim,num_classes,seed=seed+150)
     gat_params["head_weight"]=leaf(d["weight"])
     gat_params["head_bias"]=leaf(d["bias"])
 
-    
-def gcn_forward(params,x,edge_index):
-    layers=[{"weight":params[f"l{i}_weight"],"bias":params[f"l{i}_bias"]} for i in range(num_layers)]
-    param_list=[f"l{i}_weight" for i in range(num_layers)]+[f"l{i}_bias" for i in range(num_layers)]
-    _,outputs=gcn_stack_forward(layers,x,edge_index,param_list)
-    outputs=[torch.relu(v) for v in outputs]
-    logits=node_classification_head(outputs[-1],params["head_weight"],params["head_bias"])
-    return logits,outputs
+    def gcn_forward(params,x,edge_index):
+        src,dst=edge_index[0],edge_index[1]
+        layers=[{"weight":params[f"l{i}_weight"],"bias":params[f"l{i}_bias"]} for i in range(num_layers)]
+        _,outputs=gcn_stack_forward(x,src,dst,layers,activations=[torch.relu]*num_layers)
+        logits=node_classification_head(outputs[-1],params["head_weight"],params["head_bias"])
+        return logits,outputs
 
-def gat_forward(params,x,edge_index):
-    layers=[[{"weight":params[f"l{i}_h0_weight"],"attn_src":params[f"l{i}_h0_attn_src"],"attn_dst":params[f"l{i}_h0_attn_dst"],"bias":params[f"l{i}_h0_bias"]}] for i in range(num_layers)]
-    param_list=[[f"l{i}_h0_weight",f"l{i}_h0_attn_src",f"l{i}_h0_attn_dst",f"l{i}_h0_bias"] for i in range(num_layers)]
-    _,outputs=gat_stack_forward(layers,x,edge_index,param_list,merge_modes=["concat"]*num_layers)
-    outputs=[torch.relu(v) for v in outputs]
-    logits=node_classification_head(outputs[-1],params["head_weight"],params["head_bias"])
-    return logits,outputs
+    def gat_forward(params,x,edge_index):
+        src,dst=edge_index[0],edge_index[1]
+        layers=[[{"weight":params[f"l{i}_h0_weight"],"attn_src":params[f"l{i}_h0_attn_src"],"attn_dst":params[f"l{i}_h0_attn_dst"],"bias":params[f"l{i}_h0_bias"]}] for i in range(num_layers)]
+        _,outputs=gat_stack_forward(x,src,dst,layers,merge_modes=["concat"]*num_layers,activations=[torch.relu]*num_layers)
+        logits=node_classification_head(outputs[-1],params["head_weight"],params["head_bias"])
+        return logits,outputs
 
     gcn_result=train_node_classifier(gcn_params,dataset,lambda p,x,e:gcn_forward(p,x,e)[0],num_epochs,lr)
     gat_result=train_node_classifier(gat_params,dataset,lambda p,x,e:gat_forward(p,x,e)[0],num_epochs,lr)
@@ -1095,5 +1089,9 @@ def gat_forward(params,x,edge_index):
         gcn_diag=oversmoothing_diagnostic(gcn_outputs)
         gat_diag=oversmoothing_diagnostic(gat_outputs)
 
-    return {"gcn":{"history":gcn_result["history"],"oversmoothing":gcn_diag},"gat":{"history":gat_result["history"],"oversmoothing":gat_diag},"dataset_sizes":{"N":int(n),"E":int(edge_index.shape[1]),"C":int(num_classes)}}
+    return {
+        "gcn":{"history":gcn_result["history"],"oversmoothing":gcn_diag},
+        "gat":{"history":gat_result["history"],"oversmoothing":gat_diag},
+        "dataset_sizes":{"N":int(n),"E":int(edge_index.shape[1]),"C":int(num_classes)}
+    }
 
