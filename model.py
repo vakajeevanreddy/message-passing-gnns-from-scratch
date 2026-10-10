@@ -590,43 +590,22 @@ def init_gat_parameters(in_dim, out_dim, num_heads=1, with_bias=True, seed=None)
     return params
 
 # Step 25 - gat_stack_forward
-def gat_stack_forward(node_features, src, dst, layer_param_list, merge_modes=None, activations=None, num_nodes=None):
-    """Run a stack of multi-head GAT layers.
-
-    Args:
-        node_features: FloatTensor (N, F0).
-        src: LongTensor (E,) source indices.
-        dst: LongTensor (E,) destination indices.
-        layer_param_list: list of length L; each entry is a head_params list
-            for gat_layer_forward.
-        merge_modes: optional list of L merge mode strings ('concat' or 'mean').
-            Defaults to 'concat' for every layer.
-        activations: optional list of L callables or None. Defaults to no
-            activation for every layer.
-        num_nodes: optional int N; inferred from node_features if None.
-
-    Returns:
-        embeddings: FloatTensor (N, FL) final layer output.
-        all_layer_outputs: list of L FloatTensors, the output after each layer.
-    """
-    # TODO: Run a stack of multi-head GAT layers for deep node embeddings.
-    num_layers = len(layer_param_list)
-
+def gat_stack_forward(node_features,src,dst,layer_param_list,merge_modes=None,activations=None,num_nodes=None):
+    num_layers=len(layer_param_list)
     if merge_modes is None:
-        merge_modes = ["concat"]*num_layers
+        merge_modes=["concat"]*num_layers
     if activations is None:
-        activations = [None] * num_layers
+        activations=[None]*num_layers
+    if len(merge_modes)!=num_layers or len(activations)!=num_layers:
+        raise ValueError("Layer configuration lengths must match.")
     if num_nodes is None:
-        num_nodes = node_features.shape[0]
-    all_layer_outputs = []
-    out = node_features
+        num_nodes=node_features.shape[0]
+    outputs=[]
+    out=node_features
     for i,head_params in enumerate(layer_param_list):
-        out,_ = gat_layer_forward(out,src,dst,head_params,
-                num_nodes = out.shape[0],
-                merge_mode = merge_modes[i],
-                activation = activations[i])
-        all_layer_outputs.append(out)
-    return out,all_layer_outputs
+        out,_=gat_layer_forward(out,src,dst,head_params,num_nodes=num_nodes,merge_mode=merge_modes[i],activation=activations[i])
+        outputs.append(out)
+    return out,outputs
 
 # Step 26 - global_mean_pool
 def global_mean_pool(node_features, batch_index, num_graphs=None):
@@ -1035,6 +1014,86 @@ def oversmoothing_diagnostic(layer_features):
     mean_sim = sum(pairwise)/len(pairwise)
     return {"pairwise_similarities": pairwise, "mean_similarity": mean_sim}
 
-# Step 46 - mpnn_gnn_experiment (not yet solved)
-# TODO: implement
+# Step 46 - mpnn_gnn_experiment
+def mpnn_gnn_experiment(num_nodes=40,num_features=8,num_classes=2,num_layers=3,hidden_dim=16,num_epochs=20,lr=0.01,seed=0):
+    import torch
+
+    if num_nodes<2 or num_features<1 or num_classes<2 or num_layers<1 or hidden_dim<1 or num_epochs<1 or lr<=0:
+        raise ValueError("Invalid model configuration.")
+
+    torch.manual_seed(seed)
+    graph=generate_sbm_graph(num_nodes,num_classes,0.5,0.1,num_features,seed=seed)
+    x=graph["node_features"].float()
+    edge_index=graph["edge_index"].long()
+    y=graph["node_labels"].long()
+    n=x.shape[0]
+
+    if n!=num_nodes or y.numel()!=n:
+        raise ValueError("Graph features and labels have inconsistent dimensions.")
+    if edge_index.ndim!=2 or edge_index.shape[0]!=2:
+        raise ValueError("edge_index must have shape (2,E).")
+
+    train_mask=torch.zeros(n,dtype=torch.bool)
+    train_mask[torch.randperm(n)[:max(1,n//2)]]=True
+    dataset={"x":x,"edge_index":edge_index,"y":y,"train_mask":train_mask}
+
+    def leaf(t):
+        return torch.as_tensor(t,dtype=torch.float32).detach().clone().requires_grad_(True)
+
+    gcn_params={}
+    for i in range(num_layers):
+        d=init_gcn_parameters(num_features if i==0 else hidden_dim,hidden_dim,seed=seed+10+i)
+        gcn_params[f"l{i}_weight"]=leaf(d["weight"])
+        gcn_params[f"l{i}_bias"]=leaf(d["bias"])
+
+    d=init_gcn_parameters(hidden_dim,num_classes,seed=seed+50)
+    gcn_params["head_weight"]=leaf(d["weight"])
+    gcn_params["head_bias"]=leaf(d["bias"])
+
+    gat_params={}
+    for i in range(num_layers):
+        d=init_gat_parameters(num_features if i==0 else hidden_dim,hidden_dim,num_heads=1,seed=seed+100+i)
+        if isinstance(d,dict) and "heads" in d:
+            d=d["heads"][0]
+        elif isinstance(d,(list,tuple)):
+            d=d[0]
+        gat_params[f"l{i}_h0_weight"]=leaf(d["weight"])
+        gat_params[f"l{i}_h0_attn_src"]=leaf(d["attn_src"])
+        gat_params[f"l{i}_h0_attn_dst"]=leaf(d["attn_dst"])
+        gat_params[f"l{i}_h0_bias"]=leaf(d["bias"])
+
+    d=init_gcn_parameters(hidden_dim,num_classes,seed=seed+150)
+    gat_params["head_weight"]=leaf(d["weight"])
+    gat_params["head_bias"]=leaf(d["bias"])
+
+    
+def gcn_forward(params,x,edge_index):
+    layers=[{"weight":params[f"l{i}_weight"],"bias":params[f"l{i}_bias"]} for i in range(num_layers)]
+    param_list=[f"l{i}_weight" for i in range(num_layers)]+[f"l{i}_bias" for i in range(num_layers)]
+    _,outputs=gcn_stack_forward(layers,x,edge_index,param_list)
+    outputs=[torch.relu(v) for v in outputs]
+    logits=node_classification_head(outputs[-1],params["head_weight"],params["head_bias"])
+    return logits,outputs
+
+def gat_forward(params,x,edge_index):
+    layers=[[{"weight":params[f"l{i}_h0_weight"],"attn_src":params[f"l{i}_h0_attn_src"],"attn_dst":params[f"l{i}_h0_attn_dst"],"bias":params[f"l{i}_h0_bias"]}] for i in range(num_layers)]
+    param_list=[[f"l{i}_h0_weight",f"l{i}_h0_attn_src",f"l{i}_h0_attn_dst",f"l{i}_h0_bias"] for i in range(num_layers)]
+    _,outputs=gat_stack_forward(layers,x,edge_index,param_list,merge_modes=["concat"]*num_layers)
+    outputs=[torch.relu(v) for v in outputs]
+    logits=node_classification_head(outputs[-1],params["head_weight"],params["head_bias"])
+    return logits,outputs
+
+    gcn_result=train_node_classifier(gcn_params,dataset,lambda p,x,e:gcn_forward(p,x,e)[0],num_epochs,lr)
+    gat_result=train_node_classifier(gat_params,dataset,lambda p,x,e:gat_forward(p,x,e)[0],num_epochs,lr)
+
+    gcn_params=gcn_result["params"]
+    gat_params=gat_result["params"]
+
+    with torch.no_grad():
+        _,gcn_outputs=gcn_forward(gcn_params,x,edge_index)
+        _,gat_outputs=gat_forward(gat_params,x,edge_index)
+        gcn_diag=oversmoothing_diagnostic(gcn_outputs)
+        gat_diag=oversmoothing_diagnostic(gat_outputs)
+
+    return {"gcn":{"history":gcn_result["history"],"oversmoothing":gcn_diag},"gat":{"history":gat_result["history"],"oversmoothing":gat_diag},"dataset_sizes":{"N":int(n),"E":int(edge_index.shape[1]),"C":int(num_classes)}}
 
